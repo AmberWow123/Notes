@@ -790,11 +790,75 @@ public class ProductController {
 }
 ```
 
-## 6-
+## 6-元件的運用與交互關係
 
 ### Intro
 ---
 
+元件: 被設計用來進行資料的處理與讀寫，透過互相合作，程式得以完成使用者的請求
+
+ex. Controller or Service
+
+### 1. 元件(bean)的產生 
+---
+在類別加上特定的標記，將會被視為「元件」（bean）
+
+--> ex. @Controller or @Service
+
+(Spring Boot 啟動時，會掃描程式專案中有哪些類別具有像這樣的標記。找到的話，會默默地建立這些類別的物件。)
+
+元件在後端程式運行期間只會存在一個，也就是「單例」（singleton）。比方說記憶體中只會有一個 ProductService。假設其他地方也需要 ProductService，例如 購物車Service，那麼存取的其實都是同一個。
+
+### 2. 元件(bean)的注入
+---
+
+以第5課為例，我們在 ```ProductController``` 宣告 ```ProductService```。使用 ```@Autowired``` 標記可以將該類別的物件載入進來，正式的說法是「**注入**」（**inject**）。若以 Windows 作業系統來比喻注入，就像是對檔案「建立捷徑」。捷徑能放到不同資料夾，而資料夾中的捷徑都指向同一個檔案實體。
+
+由於 ```ProductService``` 有加上 ```@Service``` 標記，因此會被 Spring Boot 建立成元件，Controller 也才能透過 ```@Autowired``` 標記注入它。透過這樣的機制，我們不需要特地「new」一個 Service 來使用。
+
+像這樣子將元件的產生與注入交給外界處理的做法，稱為「控制反轉」（ inversion of control，IoC）。元件會存放在假想的容器中，通常稱為「IoC」容器。開發時不必到處產生元件的物件，而是從容器取得。
+
+### 3. 元件(bean)的標記
+---
+被標記的類別 (class) 或方法 (method) 會被 Spring Boot 建立成元件。
+
+1. ```@RestController```: 用來接收請求與回傳資料的表示層 (於第3課介紹)
+2. ```@Service```: 負責資料處理的業務邏輯層 (於第5課介紹)
+3. ```@Repository```: 能與database互動的資料持久層 (於第8課介紹)
+4. ```@Configuration```: 專門讀取環境參數的class (於第13課介紹)
+5. ```@Component```: 如果一個類別不太好歸類到以上類型，可以使用這個名稱比較通俗的標記，它的中文意思就是「元件」而已。
+6. ```@Bean```: 標記在方法上，其回傳值將被建立成元件。該方法通常被宣告在 Configuration 類別中。好處是能自行進行元件的建構。 (於第14課介紹)
+
+使用 ```@Autowired``` 標記能將元件注入到需要的類別。但並非每個類別都能這麼做，只有元件才能把另一個元件注入進來。
+
+### 4. 元件(bean)的依賴
+---
+
+既然 ProductService 被注入到 ProductController，那就意味著 Controller 對 Service 產生「依賴」（dependency），因為它需要業務邏輯層來做資料處理。
+
+首先，Controller 的職責應該是作為窗口，單純接收請求，請 Service 執行，並回應 API 的呼叫方。Service 會透過一種用來存取資料庫的物件（data access object，DAO）讀寫資料，再回傳結果給方法的呼叫方。
+
+
+### 5. 適當的交互關係
+---
+
+If 我們直接在 Controller 使用 DAO，可能會覺得程式碼不難。然而一旦還有 A、B、C Service 等元件也需要產品資料時，它們也都得拋出。更別說取得資料後，也許還需要做點處理，那這些地方也得寫相同的程式，不利於開發與維護。
+
+若是由 ProductService 提供讀寫產品的管道，會有程式碼重複利用的好處。因此也不建議 Service 直接使用「別人的」DAO 來存取，應該透過對應的 Service。
+
+下面筆者用圖片來輔助解說，圖中的箭頭是依賴的意思。情境是在購物平台，使用者能在產品頁面看到「產品資料」、「賣家資料」和「評價的狀況」。不理想的依賴方式，比方說像這個樣子
+
+![](https://i.imgur.com/LpK9nKl.png)
+
+首先，```會員Controller``` 和 ```產品Controller``` 應該只接收請求、呼叫自己的 Service 和回應資料。但它們還做了其他事，使自己隱含了處理業務邏輯的成份。甚至用了其他功能的 Service 和 DAO，使得交互關係變得混亂。
+
+接著看看 ```產品Service```，它使用了 ```會員DAO```，而 ```產品Controller``` 接收到資料後又用了 ```評價DAO```。如果這是一個專門給前端運用的產品資料，筆者會建議在 ```產品Service``` 透過其他 Service 取得需要的資料，再一次組合起來回傳給 Controller。
+
+倘若未適當地將程式碼做分層，重複寫下拋出 HTTP 404的程式碼事小，如果取得資料後還需做其他處理，可能會造成過多重複的程式碼。理想的元件依賴方式會像這個樣子：
+
+![](https://i.imgur.com/aM4g3WK.png)
+
+對於會員、產品與評價的功能，各自的 Controller 只依賴自己的 Service，而 DAO 只被自己的 Service 依賴。其中 Service 會實作出資料處理的業務邏輯，開放給需要的元件，以達到重複利用的效益。
 
 ## 7-
 

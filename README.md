@@ -2,7 +2,7 @@
 
 Credit to [Vincent Zheng](https://chikuwa-tech-study.blogspot.com/)
 
-## 1
+## 1-Build Starter Project
 
 ### Definition
 ---
@@ -13,16 +13,14 @@ Also, 內嵌伺服器軟體「Tomcat」，只要打包成 JAR 檔執行，即可
 ---
 [Spring Initializr](https://start.spring.io/): 快速產生全新的Spring Boot Project
 
-## 2
+## 2-Design RESful API
 
-### Design RESful API
----
 前端程式如 App、Web，是由user親手去操作的，而後端程式則是被呼叫時才有所反應。
 
 前端與後端之間的溝通方式，我們稱為「API」。
     
-#### 1. API Definition
-
+### 1. API Definition
+---
 API as "Application Program Interface", 軟體系統不同部分的銜接約定
 
 對前後端來說，就是雙方溝通的方式。
@@ -32,8 +30,8 @@ API as "Application Program Interface", 軟體系統不同部分的銜接約定
 
 > ex. 以生活化的例子來比喻，可以想像成客人在逛百貨公司的美食街，裡面有很多店家。決定好店家後，便填寫菜單，讓店家為自己服務。在這個例子中，百貨公司是系統、店家是 API，而菜單是資料。每個店家有不同的菜單，也就是接受不同的資料格式。
 
-#### 2. How HTTP Works
-
+### 2. How HTTP Works
+---
 當使用者發出請求，意味著要對某種東西(Data)進行操作(包含取得、編輯、新增、刪除等)
 
 HTTP 請求方法便是以這些操作方式為基礎
@@ -44,8 +42,8 @@ HTTP 請求方法便是以這些操作方式為基礎
 4. PATCH：部份更新資源。
 5. DELETE：刪除資源。
 
-#### 3. RESTful API
-
+### 3. RESTful API
+---
 REST as "Representational State Transfer", 他是一種設計風格，將網路上的東西都是為資源，並有不同操作方式。
 
 一個完整的**RESTful API**，包含請求方法與資源路徑。
@@ -66,8 +64,8 @@ REST as "Representational State Transfer", 他是一種設計風格，將網路�
 
 前端知道透過某個 API 會取得什麼資料，後端則知道某個 API 被呼叫時要做什麼事情。
 
-#### 4. RESTful API in Spring Boot
-
+### 4. RESTful API in Spring Boot
+---
 ```java=
 // 取得一個產品
 @GetMapping("/products/{id}")
@@ -88,7 +86,7 @@ REST as "Representational State Transfer", 他是一種設計風格，將網路�
 @PostMapping("/carts/{id}/checkout")
 ```
 
-## 3 - 在Controller實作API (1)
+## 3-在Controller實作API (1)
 
 ### Intro
 ---
@@ -281,7 +279,7 @@ Spring Boot 會將請求主體的 JSON 字串轉換為該資料型態的物件�
 其中「Location」欄位值就是產品的 URI，它會指向這次新增的資源。也就是說，對這個資源路徑發出 GET 請求，便能獲得該資源。
 
 
-## 4－在 Controller 實作 API (2)
+## 4-在 Controller 實作 API (2)
 
 ### Intro
 ---
@@ -508,7 +506,7 @@ public class ProductController {
 }
 ```
 
-## 5.三層式架構
+## 5-三層式架構
 
 ### Intro
 ---
@@ -522,6 +520,8 @@ public class ProductController {
 1. 表示層
     
     Controller, 負責接收前端的request, 並請Service處理, 最後將資料return(response)
+    
+    (根據前端send 過來的request 看是GET/POST/... 來決定要call Service的哪一個corresponding method)
 
 2. 業務邏輯層
 
@@ -529,11 +529,12 @@ public class ProductController {
     
     也可能被其他Service呼叫
     
-3. 資料持久層
+3. 資料持久層 (對database進行修改的地方)
 
     擔任與Database溝通的媒介, 會被 Service 呼叫
     
     常透過「資料存取物件」（data access object，DAO）來實現。
+    
 
 對不同層次賦予各自的職責，可以達到分工，而相同的程式碼也能方便地重複利用。當程式專案的規模變大後，便可感受到好處了。
 
@@ -569,7 +570,7 @@ public class UnprocessableEntityException extends RuntimeException {
 }
 ```
 
-### 資料持久層 in practice
+### Repository in practice (資料持久層)
 ---
 ```@Repository```: 代表這是一個資料持久層
 
@@ -600,15 +601,20 @@ public Product insert(Product product) {
 ```
 
 
-```replace(id, p)```:
+```find(id)```, ```replace(id, p)```:
 ```java=
+public Optional<Product> find(String id) {
+    return productDB.stream()
+            .filter(p -> p.getId().equals(id))
+            .findFirst();
+}
+
 public Product replace(String id, Product product) {
     Optional<Product> productOp = find(id);
     productOp.ifPresent(p -> {
         p.setName(product.getName());
         p.setPrice(product.getPrice());
     });
-
     return product;
 }
 ```
@@ -622,14 +628,8 @@ public void delete(String id) {
 ```
 
 
-```find(id)```, ```find(param)```:
+```find(param)```:
 ```java=
-public Optional<Product> find(String id) {
-    return productDB.stream()
-            .filter(p -> p.getId().equals(id))
-            .findFirst();
-}
-
 public List<Product> find(ProductQueryParameter param) {
     String keyword = Optional.ofNullable(param.getKeyword()).orElse("");
     String orderBy = param.getOrderBy();
@@ -665,34 +665,156 @@ private Comparator<Product> genSortComparator(String orderBy, String sortRule) {
 ```
 
 
-### 
+### Service in practice (業務邏輯層)
+---
+```@Service```: 表示這是一個業務邏輯層
+
+```java=
+@Service
+public class ProductService {
+
+    @Autowired
+    private MockProductDAO productDAO;
+}
+```
+為了使用資料持久層，該類別宣告了它的全域變數。
+
+加上 @Autowired 標記。如此一來，Spring Boot 啟動時便會給該變數傳入物件，這個特性稱為「 依賴注入」（dependency injection）。
+
+```createProduct(request)```
+```java=
+public Product createProduct(Product request) {
+    boolean isIdDuplicated = productDAO.find(request.getId()).isPresent();
+    if (isIdDuplicated) {
+        throw new UnprocessableEntityException("The id of the product is duplicated.");
+    }
+
+    Product product = new Product();
+    product.setId(request.getId());
+    product.setName(request.getName());
+    product.setPrice(request.getPrice());
+
+    return productDAO.insert(product);
+}
+```
+
+
+```getProduct(id)```
+```java=
+public Product getProduct(String id) {
+    return productDAO.find(id)
+            .orElseThrow(() -> new NotFoundException("Can't find product."));
+}
+```
+
+
+```replaceProduct(id, request)```
+```java=
+public Product replaceProduct(String id, Product request) {
+    Product product = getProduct(id);
+    return productDAO.replace(product.getId(), request);
+}
+```
+
+
+```deleteProduct(id)```
+```java=
+public void deleteProduct(String id) {
+    Product product = getProduct(id);
+    productDAO.delete(product.getId());
+}
+```
+
+
+```getProducts(param)```
+```java=
+public List<Product> getProducts(ProductQueryParameter param) {
+    return productDAO.find(param);
+}
+```
+
+以上的範例程式與原先的 Controller 也是大同小異。其中 createProduct 方法會檢查產品 id 是否重複，是的話，將拋出 HTTP 422的例外。而 getProduct、replaceProduct 與 deleteProduct 方法在找不到產品時，則拋出 HTTP 404的例外。
+
+
+### Controller Calls Service (表示層 -> 業務邏輯)
 ---
 
-## 6.
+最後我們要改寫 Controller，讓每個 API 都透過業務邏輯層來存取資料。
+
+先宣告業務邏輯層的全域變數，讓 Spring Boot 自動傳入該物件。接著在各個 API 呼叫對應的方法。
+
+```java=
+@RestController
+@RequestMapping(value = "/products", produces = MediaType.APPLICATION_JSON_VALUE)
+public class ProductController {
+    @Autowired
+    private ProductService productService;
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Product> getProduct(@PathVariable("id") String id) {
+        Product product = productService.getProduct(id);
+        return ResponseEntity.ok(product);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<Product>> getProducts(@ModelAttribute ProductQueryParameter param) {
+        List<Product> products = productService.getProducts(param);
+        return ResponseEntity.ok(products);
+    }
+
+    @PostMapping
+    public ResponseEntity<Product> createProduct(@RequestBody Product request) {
+        Product product = productService.createProduct(request);
+
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(product.getId())
+                .toUri();
+
+        return ResponseEntity.created(location).body(product);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Product> replaceProduct(
+            @PathVariable("id") String id, @RequestBody Product request) {
+        Product product = productService.replaceProduct(id, request);
+        return ResponseEntity.ok(product);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity deleteProduct(@PathVariable("id") String id) {
+        productService.deleteProduct(id);
+        return ResponseEntity.noContent().build();
+    }
+}
+```
+
+## 6-
 
 ### Intro
 ---
 
 
-## 7.
+## 7-
 
 ### Intro
 ---
 
 
-## 8.
+## 8-
 
 ### Intro
 ---
 
 
-## 9.
+## 9-
 
 ### Intro
 ---
 
 
-## 10.
+## 10-
 
 ### Intro
 ---
